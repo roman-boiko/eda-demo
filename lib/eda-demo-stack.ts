@@ -53,7 +53,7 @@ export class EdaDemoStack extends cdk.Stack {
 
     // Create Lambda function for order processing
     const ordersHandler = new nodejs.NodejsFunction(this, 'OrdersHandler', {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_22_X,  
       handler: 'handler',
       entry: path.join(__dirname, '../lambda/orders.ts'),
       environment: {
@@ -64,52 +64,44 @@ export class EdaDemoStack extends cdk.Stack {
 
     // Create Lambda function for order fulfillment
     const fulfillmentHandler = new nodejs.NodejsFunction(this, 'FulfillmentHandler', {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'handler',
       entry: path.join(__dirname, '../lambda/fulfillment.ts'),
-      environment: {
-        ORDERS_TABLE_NAME: ordersTable.tableName,
-      },
     });
 
     // Create Lambda function for loyalty points
     const loyaltyHandler = new nodejs.NodejsFunction(this, 'LoyaltyHandler', {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'handler',
       entry: path.join(__dirname, '../lambda/loyalty.ts'),
-      environment: {
-        ORDERS_TABLE_NAME: ordersTable.tableName,
-      },
     });
 
     // Create Lambda function for order validation
     const validateOrderHandler = new nodejs.NodejsFunction(this, 'ValidateOrderHandler', {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'handler',
       entry: path.join(__dirname, '../lambda/validate-order.ts'),
-      environment: {
-        ORDERS_TABLE_NAME: ordersTable.tableName,
-      },
     });
 
     // Create Lambda function for payment preauthorization
     const preauthorizePaymentHandler = new nodejs.NodejsFunction(this, 'PreauthorizePaymentHandler', {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'handler',
       entry: path.join(__dirname, '../lambda/preauthorize-payment.ts'),
-      environment: {
-        ORDERS_TABLE_NAME: ordersTable.tableName,
-      },
     });
 
     // Create Lambda function for fraud check
     const checkFraudHandler = new nodejs.NodejsFunction(this, 'CheckFraudHandler', {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'handler',
       entry: path.join(__dirname, '../lambda/check-fraud.ts'),
-      environment: {
-        ORDERS_TABLE_NAME: ordersTable.tableName,
-      },
+    });
+
+    // Create Lambda function for payment processing
+    const processPaymentHandler = new nodejs.NodejsFunction(this, 'ProcessPaymentHandler', {
+      runtime: lambda.Runtime.NODEJS_22_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../lambda/process-payment.ts'),
     });
 
     // Create Step Functions state machine for payment processing
@@ -128,11 +120,9 @@ export class EdaDemoStack extends cdk.Stack {
       resultPath: '$.fraudCheckResult',
     });
 
-    const processPaymentTask = new stepfunctions.Pass(this, 'Process Payment', {
-      result: stepfunctions.Result.fromObject({
-        status: 'paid',
-        message: 'Payment processed successfully'
-      })
+    const processPaymentTask = new stepfunctionsTasks.LambdaInvoke(this, 'Process Payment', {
+      lambdaFunction: processPaymentHandler,
+      resultPath: '$.paymentResult',
     });
 
     const updateOrderStatusTask = new stepfunctions.Pass(this, 'Update Order Status', {
@@ -174,9 +164,23 @@ export class EdaDemoStack extends cdk.Stack {
       .branch(preauthorizePaymentTask.next(validatePreauthorizationChoice))
       .branch(checkFraudTask.next(validateFraudCheckChoice));
 
+    const mapOriginalData = new stepfunctions.Pass(this, 'Map Original Data', {
+      parameters: {
+        "version": "0",
+        "id.$": "$[0].id",
+        "detail-type.$": "$[0].detail-type",
+        "source.$": "$[0].source",
+        "account.$": "$[0].account",
+        "time.$": "$[0].time",
+        "region.$": "$[0].region",
+        "resources.$": "$[0].resources",
+        "detail.$": "$[0].detail"
+      }
+    });
+
     const choice = new stepfunctions.Choice(this, 'Is Order Valid?')
       .when(stepfunctions.Condition.booleanEquals('$.validationResult.Payload.isValid', true),
-        parallelState.next(processPaymentTask.next(updateOrderStatusTask)))
+        parallelState.next(mapOriginalData).next(processPaymentTask.next(updateOrderStatusTask)))
       .otherwise(failState);
 
     const paymentStateMachine = new stepfunctions.StateMachine(this, 'PaymentProcessingStateMachine', {
