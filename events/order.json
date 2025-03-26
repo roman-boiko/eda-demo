@@ -1,7 +1,5 @@
 {
-    "orderId": "1234567890",
     "customerId": "1234567890",
-    "orderDate": "2025-01-01",
     "products": [
         {
             "productId": "1234567890",
