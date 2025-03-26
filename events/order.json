@@ -1,0 +1,19 @@
+{
+    "orderId": "1234567890",
+    "customerId": "1234567890",
+    "orderDate": "2025-01-01",
+    "products": [
+        {
+            "productId": "1234567890",
+            "quantity": 1,
+            "price": 100.00
+        },
+        {
+            "productId": "0937485937",
+            "quantity": 2,
+            "price": 20.00
+        }
+    ],
+    "totalPrice": 140.00,
+    "status": "pending"
+}
