@@ -49,7 +49,7 @@ export class EdaDemoStack extends cdk.Stack {
       ],
     });
 
-    // Create Lambda function
+    // Create Lambda function for order processing
     const ordersHandler = new nodejs.NodejsFunction(this, 'OrdersHandler', {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'handler',
@@ -60,11 +60,59 @@ export class EdaDemoStack extends cdk.Stack {
       },
     });
 
-    // Grant DynamoDB permissions to Lambda
+    // Create Lambda function for order fulfillment
+    const fulfillmentHandler = new nodejs.NodejsFunction(this, 'FulfillmentHandler', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../lambda/fulfillment.ts'),
+      environment: {
+        ORDERS_TABLE_NAME: ordersTable.tableName,
+      },
+    });
+
+    // Create Lambda function for loyalty points
+    const loyaltyHandler = new nodejs.NodejsFunction(this, 'LoyaltyHandler', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../lambda/loyalty.ts'),
+      environment: {
+        ORDERS_TABLE_NAME: ordersTable.tableName,
+      },
+    });
+
+    // Grant DynamoDB permissions to Lambda functions
     ordersTable.grantWriteData(ordersHandler);
+    ordersTable.grantReadWriteData(fulfillmentHandler);
+    ordersTable.grantReadData(loyaltyHandler);
 
     // Grant EventBridge permissions to Lambda
     ordersBus.grantPutEventsTo(ordersHandler);
+
+    // Create EventBridge rule for order fulfillment
+    const fulfillmentRule = new events.Rule(this, 'OrderFulfillmentRule', {
+      eventBus: ordersBus,
+      description: 'Route orders to fulfillment Lambda',
+      eventPattern: {
+        source: ['orders'],
+        detailType: ['order.created'],
+      },
+      targets: [
+        new targets.LambdaFunction(fulfillmentHandler),
+      ],
+    });
+
+    // Create EventBridge rule for loyalty points
+    const loyaltyRule = new events.Rule(this, 'OrderLoyaltyRule', {
+      eventBus: ordersBus,
+      description: 'Route orders to loyalty Lambda',
+      eventPattern: {
+        source: ['orders'],
+        detailType: ['order.created'],
+      },
+      targets: [
+        new targets.LambdaFunction(loyaltyHandler),
+      ],
+    });
 
     // Create API Gateway
     const api = new apigateway.RestApi(this, 'OrdersApi', {
@@ -76,5 +124,15 @@ export class EdaDemoStack extends cdk.Stack {
     const ordersResource = api.root.addResource('orders');
     ordersResource.addMethod('POST', new apigateway.LambdaIntegration(ordersHandler));
 
+    // Add stack outputs
+    new cdk.CfnOutput(this, 'OrdersApiUrl', {
+      value: api.url,
+      description: 'API Gateway URL for orders service',
+    });
+
+    new cdk.CfnOutput(this, 'OrdersTableName', {
+      value: ordersTable.tableName,
+      description: 'DynamoDB table name for orders',
+    });
   }
 }
