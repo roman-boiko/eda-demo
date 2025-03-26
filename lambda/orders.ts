@@ -1,9 +1,11 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge';
 
-const client = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(client);
+const dynamoClient = new DynamoDBClient({});
+const docClient = DynamoDBDocumentClient.from(dynamoClient);
+const eventBridgeClient = new EventBridgeClient({});
 
 function generateOrderId(): string {
   const timestamp = Date.now();
@@ -34,6 +36,21 @@ export const handler = async (
     });
 
     await docClient.send(command);
+
+    // Publish event to EventBridge
+    const eventCommand = new PutEventsCommand({
+      Entries: [
+        {
+          Source: 'orders',
+          DetailType: 'order.created',
+          Detail: JSON.stringify(order),
+          EventBusName: process.env.ORDERS_BUS_NAME,
+          Time: new Date(),
+        },
+      ],
+    });
+
+    await eventBridgeClient.send(eventCommand);
 
     return {
       statusCode: 200,
