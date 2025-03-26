@@ -19,8 +19,8 @@ export const handler = async (
   
   const order = event.detail;
   
-  // Simulate payment processing with 95% success rate
-  const isSuccessful = Math.random() < 0.95;
+
+  const isSuccessful = true;
   
   if (isSuccessful) {
     // Generate a payment ID

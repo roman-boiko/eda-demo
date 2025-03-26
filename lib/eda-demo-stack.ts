@@ -26,6 +26,15 @@ export class EdaDemoStack extends cdk.Stack {
       pointInTimeRecovery: true,
     });
 
+    // Create DynamoDB table for payments
+    const paymentsTable = new dynamodb.Table(this, 'PaymentsTable', {
+      partitionKey: { name: 'paymentId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'date', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // For development only
+      pointInTimeRecovery: true,
+    });
+
     // Create EventBridge bus
     const ordersBus = new events.EventBus(this, 'OrdersBus', {
       eventBusName: 'OrdersBus',
@@ -125,6 +134,25 @@ export class EdaDemoStack extends cdk.Stack {
       resultPath: '$.paymentResult',
     });
 
+    const convertTotalPriceToString = new stepfunctions.Pass(this, 'Convert Total Price to String', {
+      parameters: {
+        "paymentId.$": "$.paymentResult.Payload.paymentId",
+        "date.$": "$.time",
+        "orderId.$": "$.detail.orderId",
+        "totalPrice.$": "States.Format('{}', $.detail.totalPrice)"
+      }
+    });
+
+    const recordPaymentTask = new stepfunctionsTasks.DynamoPutItem(this, 'Record Payment', {
+      table: paymentsTable,
+      item: {
+        paymentId: stepfunctionsTasks.DynamoAttributeValue.fromString(stepfunctions.JsonPath.stringAt('$.paymentId')),
+        date: stepfunctionsTasks.DynamoAttributeValue.fromString(stepfunctions.JsonPath.stringAt('$.date')),
+        orderId: stepfunctionsTasks.DynamoAttributeValue.fromString(stepfunctions.JsonPath.stringAt('$.orderId')),
+        totalPrice: stepfunctionsTasks.DynamoAttributeValue.fromString(stepfunctions.JsonPath.stringAt('$.totalPrice'))
+      }
+    });
+
     const updateOrderStatusTask = new stepfunctions.Pass(this, 'Update Order Status', {
       result: stepfunctions.Result.fromObject({
         status: 'completed',
@@ -180,7 +208,7 @@ export class EdaDemoStack extends cdk.Stack {
 
     const choice = new stepfunctions.Choice(this, 'Is Order Valid?')
       .when(stepfunctions.Condition.booleanEquals('$.validationResult.Payload.isValid', true),
-        parallelState.next(mapOriginalData).next(processPaymentTask.next(updateOrderStatusTask)))
+        parallelState.next(mapOriginalData).next(processPaymentTask.next(convertTotalPriceToString).next(recordPaymentTask).next(updateOrderStatusTask)))
       .otherwise(failState);
 
     const paymentStateMachine = new stepfunctions.StateMachine(this, 'PaymentProcessingStateMachine', {
@@ -197,6 +225,9 @@ export class EdaDemoStack extends cdk.Stack {
     ordersTable.grantReadData(validateOrderHandler);
     ordersTable.grantReadData(preauthorizePaymentHandler);
     ordersTable.grantReadData(checkFraudHandler);
+
+    // Grant DynamoDB permissions to Step Functions state machine
+    paymentsTable.grantWriteData(paymentStateMachine);
 
     // Grant EventBridge permissions to Lambda
     ordersBus.grantPutEventsTo(ordersHandler);
