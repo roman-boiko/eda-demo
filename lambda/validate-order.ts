@@ -1,4 +1,11 @@
 import { EventBridgeEvent } from 'aws-lambda';
+import { Logger } from '@aws-lambda-powertools/logger';
+// import { Tracer } from '@aws-lambda-powertools/tracer';
+// import { captureLambdaHandler } from '@aws-lambda-powertools/tracer/middleware';
+// import middy from '@middy/core';
+
+const logger = new Logger();
+// const tracer = new Tracer({serviceName: 'ValidateOrderService'});
 
 interface Order {
   orderId: string;
@@ -14,10 +21,10 @@ interface Order {
   orderDate: string;
 }
 
-export const handler = async (
+const lambdaHandler = async (
   event: EventBridgeEvent<'order.created', Order>
 ): Promise<{ isValid: boolean; message: string; order: Order }> => {
-  console.log('Validating order:', JSON.stringify(event.detail, null, 2));
+  logger.info('Validating order:', JSON.stringify(event.detail, null, 2));
   
   const order = event.detail;
   
@@ -25,14 +32,14 @@ export const handler = async (
   const isValid = Math.random() < 0.95;
   
   if (isValid) {
-    console.log(`Order ${order.orderId} is valid`);
+    logger.info(`Order ${order.orderId} is valid`);
     return {
       isValid: true,
       message: 'Order validated successfully',
       order
     };
   } else {
-    console.log(`Order ${order.orderId} is invalid`);
+    logger.info(`Order ${order.orderId} is invalid`);
     return {
       isValid: false,
       message: 'Order validation failed',
@@ -40,3 +47,5 @@ export const handler = async (
     };
   }
 }; 
+
+export const handler = lambdaHandler;

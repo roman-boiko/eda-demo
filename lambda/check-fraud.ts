@@ -1,4 +1,11 @@
 import { EventBridgeEvent } from 'aws-lambda';
+import { Logger } from '@aws-lambda-powertools/logger';
+// import { Tracer } from '@aws-lambda-powertools/tracer';
+// import { captureLambdaHandler } from '@aws-lambda-powertools/tracer/middleware';
+// import middy from '@middy/core';
+
+const logger = new Logger();
+// const tracer = new Tracer({serviceName: 'CheckFraudService'});
 
 interface Order {
   orderId: string;
@@ -14,10 +21,10 @@ interface Order {
   orderDate: string;
 }
 
-export const handler = async (
+const lambdaHandler = async (
   event: EventBridgeEvent<'order.created', Order>
 ): Promise<{ isClean: boolean; message: string; order: Order }> => {
-  console.log('Checking for fraud:', JSON.stringify(event.detail, null, 2));
+  logger.info('Checking for fraud:', JSON.stringify(event.detail, null, 2));
   
   const order = event.detail;
   
@@ -25,14 +32,14 @@ export const handler = async (
   const isClean = Math.random() < 0.90;
   
   if (isClean) {
-    console.log(`Order ${order.orderId} passed fraud check`);
+    logger.info(`Order ${order.orderId} passed fraud check`);
     return {
       isClean: true,
       message: 'Fraud check passed successfully',
       order
     };
   } else {
-    console.log(`Order ${order.orderId} failed fraud check`);
+    logger.error(`Order ${order.orderId} failed fraud check`);
     return {
       isClean: false,
       message: 'Fraud check failed',
@@ -40,3 +47,5 @@ export const handler = async (
     };
   }
 }; 
+
+export const handler = lambdaHandler;

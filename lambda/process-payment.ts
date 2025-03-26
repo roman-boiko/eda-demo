@@ -1,4 +1,11 @@
 import { EventBridgeEvent } from 'aws-lambda';
+import { Logger } from '@aws-lambda-powertools/logger';
+// import { Tracer } from '@aws-lambda-powertools/tracer';
+// import { captureLambdaHandler } from '@aws-lambda-powertools/tracer/middleware';
+// import middy from '@middy/core';
+
+const logger = new Logger();
+// const tracer = new Tracer({serviceName: 'ProcessPaymentService'});
 
 interface Order {
   orderId: string;
@@ -12,10 +19,10 @@ interface Order {
   orderDate: string;
 }
 
-export const handler = async (
+const lambdaHandler = async (
   event: EventBridgeEvent<'order.created', Order>
 ): Promise<{ orderId: string; paymentId: string; status: string; message: string }> => {
-  console.log('Processing payment:', JSON.stringify(event.detail, null, 2));
+  logger.info('Processing payment:', JSON.stringify(event.detail, null, 2));
   
   const order = event.detail;
   
@@ -26,7 +33,7 @@ export const handler = async (
     // Generate a payment ID
     const paymentId = `PAY-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     
-    console.log(`Payment processed successfully for order ${order.orderId}`);
+    logger.info(`Payment processed successfully for order ${order.orderId}`);
     return {
       orderId: order.orderId,
       paymentId,
@@ -34,7 +41,7 @@ export const handler = async (
       message: 'Payment processed successfully'
     };
   } else {
-    console.log(`Payment failed for order ${order.orderId}`);
+    logger.error(`Payment failed for order ${order.orderId}`);
     return {
       orderId: order.orderId,
       paymentId: '',
@@ -43,3 +50,5 @@ export const handler = async (
     };
   }
 }; 
+
+export const handler = lambdaHandler;

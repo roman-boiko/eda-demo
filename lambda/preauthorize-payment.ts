@@ -1,4 +1,11 @@
 import { EventBridgeEvent } from 'aws-lambda';
+import { Logger } from '@aws-lambda-powertools/logger';
+// import { Tracer } from '@aws-lambda-powertools/tracer';
+// import { captureLambdaHandler } from '@aws-lambda-powertools/tracer/middleware';
+// import middy from '@middy/core';
+
+const logger = new Logger();
+// const tracer = new Tracer({serviceName: 'PreauthorizePaymentService'});
 
 interface Order {
   orderId: string;
@@ -14,10 +21,10 @@ interface Order {
   orderDate: string;
 }
 
-export const handler = async (
+const lambdaHandler = async (
   event: EventBridgeEvent<'order.created', Order>
 ): Promise<{ isAuthorized: boolean; message: string; order: Order }> => {
-  console.log('Preauthorizing payment:', JSON.stringify(event.detail, null, 2));
+  logger.info('Preauthorizing payment:', JSON.stringify(event.detail, null, 2));
   
   const order = event.detail;
   
@@ -25,14 +32,14 @@ export const handler = async (
   const isAuthorized = Math.random() < 0.90;
   
   if (isAuthorized) {
-    console.log(`Payment for order ${order.orderId} is authorized`);
+    logger.info(`Payment for order ${order.orderId} is authorized`);
     return {
       isAuthorized: true,
       message: 'Payment preauthorized successfully',
       order
     };
   } else {
-    console.log(`Payment for order ${order.orderId} is not authorized`);
+    logger.info(`Payment for order ${order.orderId} is not authorized`);
     return {
       isAuthorized: false,
       message: 'Payment preauthorization failed',
@@ -40,3 +47,5 @@ export const handler = async (
     };
   }
 }; 
+
+export const handler = lambdaHandler;  

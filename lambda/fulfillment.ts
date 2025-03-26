@@ -1,4 +1,11 @@
 import { EventBridgeEvent } from 'aws-lambda';
+import { Logger } from '@aws-lambda-powertools/logger';
+// import { Tracer } from '@aws-lambda-powertools/tracer';
+// import { captureLambdaHandler } from '@aws-lambda-powertools/tracer/middleware';
+// import middy from '@middy/core';
+
+const logger = new Logger();
+// const tracer = new Tracer({serviceName: 'FulfillmentService'});
 
 interface Order {
   orderId: string;
@@ -14,15 +21,15 @@ interface Order {
   orderDate: string;
 }
 
-export const handler = async (
+const lambdaHandler = async (
   event: EventBridgeEvent<'order.created', Order>
 ): Promise<void> => {
-  console.log('Received order fulfillment event:', JSON.stringify(event, null, 2));
+  logger.info('Received order fulfillment event:', JSON.stringify(event, null, 2));
   
   const order = event.detail;
-  console.log(`Processing order ${order.orderId} for customer ${order.customerId}`);
-  console.log(`Order total: $${order.totalPrice}`);
-  console.log('Products:', JSON.stringify(order.products, null, 2));
+  logger.info(`Processing order ${order.orderId} for customer ${order.customerId}`);
+  logger.info(`Order total: $${order.totalPrice}`);
+  logger.info('Products:', JSON.stringify(order.products, null, 2));
   
   // Here you would typically:
   // 1. Update order status to "processing"
@@ -31,5 +38,7 @@ export const handler = async (
   // 4. Update inventory
   // 5. Update order status to "fulfilled"
   
-  console.log('Order fulfillment processing completed');
+  logger.info('Order fulfillment processing completed');
 }; 
+
+export const handler = lambdaHandler;

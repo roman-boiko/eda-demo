@@ -2,10 +2,19 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge';
+import { Logger } from '@aws-lambda-powertools/logger';
 
+// import { Tracer } from '@aws-lambda-powertools/tracer';
+// import { captureLambdaHandler } from '@aws-lambda-powertools/tracer/middleware';
+// import middy from '@middy/core';
+
+const logger = new Logger();
+// const tracer = new Tracer({serviceName: 'OrdersService'});
 const dynamoClient = new DynamoDBClient({});
+// tracer.captureAWSv3Client(dynamoClient);
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
 const eventBridgeClient = new EventBridgeClient({});
+// tracer.captureAWSv3Client(eventBridgeClient);
 
 function generateOrderId(): string {
   const timestamp = Date.now();
@@ -13,10 +22,10 @@ function generateOrderId(): string {
   return `ORD-${timestamp}-${random}`;
 }
 
-export const handler = async (
+const lambdaHandler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
-  console.log('Received event:', JSON.stringify(event, null, 2));
+  logger.info('Received event:', JSON.stringify(event, null, 2));
 
   try {
     const orderData = JSON.parse(event.body || '{}');
@@ -60,7 +69,7 @@ export const handler = async (
       })
     };
   } catch (error) {
-    console.error('Error processing order:', error);
+    logger.error('Error processing order:', error as Error);
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -70,3 +79,5 @@ export const handler = async (
     };
   }
 }; 
+
+export const handler = lambdaHandler
