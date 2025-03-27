@@ -446,13 +446,16 @@ export class EdaDemoStack extends cdk.Stack {
       targets: [new targets.LambdaFunction(fulfillmentHandler)],
     });
 
-    // Create EventBridge rule for loyalty points
-    const loyaltyRule = new events.Rule(this, "OrderLoyaltyRule", {
+    // Create EventBridge rule for loyalty service
+    const loyaltyRule = new events.Rule(this, 'LoyaltyRule', {
       eventBus: ordersBus,
-      description: "Route orders to loyalty Lambda",
+      description: 'Rule to trigger loyalty points calculation',
       eventPattern: {
-        source: ["orders"],
-        detailType: ["order.created"],
+        source: ['orders'],
+        detailType: ['order.created'],
+        detail: {
+          totalPrice: [{ numeric: ['>', 100] }]
+        }
       },
       targets: [new targets.LambdaFunction(loyaltyHandler)],
     });
